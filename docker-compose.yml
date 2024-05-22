@@ -1,0 +1,71 @@
+version: "3"
+services:
+  proxy:
+    image: traefik:v2.8
+    # Enables the web UI and tells Traefik to listen to docker
+    command:
+      - --accesslog
+      - --providers.docker=true
+      - --providers.docker.exposedByDefault=false
+      - --providers.file.directory=/etc/traefik/dynamic_conf
+      - --entrypoints.web.address=:8080
+      - --log.level=INFO #DEBUG
+    ports:
+      # The HTTP port
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./localdev/certs/:/certs/:ro
+      - ./localdev/traefik.yaml:/etc/traefik/dynamic_conf/conf.yml:ro
+
+  api:
+    build:
+      context: ./api
+      dockerfile: ./Dockerfile
+    volumes:
+      - ./api/dist:/app/dist
+      - ./api/src:/app/src
+      - ./api/uploads:/app/uploads
+    command: ["npm", "run", "dev"]
+    environment:
+      - NODE_ENV=development
+      - NODE_STAGE=development
+      - PORT=3000
+      - MONGO_URL=mongodb://db:27017/ticketfriends
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ticketfriends-api.rule=Host(`localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.ticketfriends-api.tls=false"
+      - "traefik.http.routers.ticketfriends-api.entrypoints=web"
+      - "traefik.http.services.ticketfriends-api.loadbalancer.server.port=3000"
+    depends_on:
+      - db
+
+  client:
+    build:
+      context: ./client
+      dockerfile: ./Dockerfile
+    volumes:
+      - ./client/src:/app/src
+      - ./client/public:/app/public
+      - ./client/tsconfig.json:/app/tsconfig.json
+      - ./client/vite.config.ts:/app/vite.config.ts
+      - ./client/tsconfig.node.json:/app/tsconfig.node.json
+      - ./client/index.html:/app/index.html
+    command: ["npm", "start"]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ticketfriends-client.rule=Host(`localhost`)"
+      - "traefik.http.routers.ticketfriends-client.tls=false"
+      - "traefik.http.routers.ticketfriends-client.entrypoints=web"
+      - "traefik.http.services.ticketfriends-client.loadbalancer.server.port=5173"
+
+  db:
+    image: mongo:7.0
+    volumes:
+      - mongodb:/data/db
+    ports:
+      - "27017:27017"
+
+volumes:
+  mongodb:

@@ -1,0 +1,52 @@
+FROM node:20-alpine as build
+
+RUN apk add --update --no-cache \
+  make \
+  g++ \
+  jpeg-dev \
+  cairo-dev \
+  giflib-dev \
+  pango-dev \
+  libtool \
+  autoconf \
+  automake
+
+
+WORKDIR /app
+
+RUN mkdir -p /app/src
+
+COPY ./package.json ./package-lock.json ./tsconfig.json /app/
+
+RUN npm install
+
+COPY ./src /app/src
+# COPY ./types /app/types
+
+RUN npm run build
+
+FROM node:20-alpine
+
+RUN apk add --update --no-cache \
+  make \
+  g++ \
+  jpeg-dev \
+  cairo-dev \
+  giflib-dev \
+  pango-dev \
+  libtool \
+  autoconf \
+  automake
+
+WORKDIR /app
+
+RUN mkdir -p /app/src
+
+COPY --from=build /app/package.json /app/package-lock.json /app/
+COPY --from=build /app/dist/ /app/src/
+
+RUN npm ci --only=production
+
+EXPOSE 3000
+
+CMD [ "npm", "run", "prod" ]
