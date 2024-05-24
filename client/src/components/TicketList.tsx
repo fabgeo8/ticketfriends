@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Card, List, Button, Modal, Input, Space, Divider } from 'antd'
+import {Card, List, Button, Modal, Input, Space, Divider, notification} from 'antd'
 import { CheckCircleTwoTone, HomeOutlined, UploadOutlined } from '@ant-design/icons'
 import { Link } from 'react-router-dom'
 import utilities from '../utilities.module.scss'
@@ -19,7 +19,7 @@ interface Ticket {
 const TicketList: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([])
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null)
-  const [selectedPageIndex, setSelectedPageIndex] = useState<number | null>(null)
+  const [selectedPageIndex, setSelectedPageIndex] = useState<number>(-1)
   const [sharedEmails, setSharedEmails] = useState<string[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -43,6 +43,53 @@ const TicketList: React.FC = () => {
     setIsModalOpen(true)
   }
 
+  const openNotification = (type: string, subject: string, desc: string) => {
+    if (type === 'warning') {
+      notification.warning({
+        message: subject,
+        description: (
+            <div>
+              { desc }
+            </div>
+        ),
+        duration: 5, // Notification will stay for 5 seconds
+      })
+    } else if (type === 'success') {
+      notification.success({
+        message: subject,
+        description: (
+            <div>
+              { desc }
+            </div>
+        ),
+        duration: 5, // Notification will stay for 5 seconds
+      })
+    } else if (type === 'error') {
+      notification.error({
+        message: subject,
+        description: (
+            <div>
+              { desc }
+            </div>
+        ),
+        duration: 5, // Notification will stay for 5 seconds
+      })
+    } else if (type === 'info') {
+      notification.info({
+        message: subject,
+        description: (
+            <div>
+              { desc }
+            </div>
+        ),
+        duration: 5, // Notification will stay for 5 seconds
+      })
+    }
+    else {
+      console.log('not supported notification type', type)
+    }
+  }
+
   const handleModalOk = async () => {
     try {
       const response = await fetch(`/api/tickets/${selectedTicket?._id}/pages/${selectedPageIndex}/share`, {
@@ -55,6 +102,29 @@ const TicketList: React.FC = () => {
 
       if (response.ok) {
         const updatedTicket = await response.json()
+        let updatedPage = updatedTicket.pages[selectedPageIndex];
+        const prevSharedWith = selectedTicket?.pages[selectedPageIndex].sharedWith || []
+
+        const newSharedWith = updatedPage.sharedWith.filter((email: any) => !prevSharedWith.includes(email))
+        const failedEmails = sharedEmails.filter((email: any) => !updatedPage.sharedWith.includes(email))
+
+        if (failedEmails.length > 0) {
+          openNotification(
+              'warning',
+              'Failed to Share',
+              `Failed to share ticket page with ${failedEmails.join(', ')}`
+          )
+        }
+
+        if (newSharedWith.length > 0) {
+          openNotification(
+              'success',
+              'Ticket Shared',
+              `Ticket page shared with ${newSharedWith.join(', ')}`
+          )
+        } else {
+          openNotification('info', 'No New Recipients', 'Ticket page not shared with any new recipients.')
+        }
         setTickets((prevTickets) =>
           prevTickets.map((ticket) => (ticket._id === updatedTicket._id ? updatedTicket : ticket))
         )
@@ -68,14 +138,14 @@ const TicketList: React.FC = () => {
     setIsModalOpen(false)
     setSharedEmails([])
     setSelectedTicket(null)
-    setSelectedPageIndex(null)
+    setSelectedPageIndex(-1)
   }
 
   const handleModalCancel = () => {
     setIsModalOpen(false)
     setSharedEmails([])
     setSelectedTicket(null)
-    setSelectedPageIndex(null)
+    setSelectedPageIndex(-1)
   }
 
   const handleEmailsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,13 +192,13 @@ const TicketList: React.FC = () => {
         )}
       />
       <Modal
-        title={`Share Page ${selectedPageIndex ? selectedPageIndex + 1 : ''}`}
+        title={`Share Ticket ${selectedPageIndex ? selectedPageIndex + 1 : ''}`}
         open={isModalOpen}
         onOk={handleModalOk}
         onCancel={handleModalCancel}
       >
         <Input
-          placeholder="Enter email addresses separated by commas"
+          placeholder="Enter email address to send ticket"
           value={sharedEmails.join(', ')}
           onChange={handleEmailsChange}
         />
