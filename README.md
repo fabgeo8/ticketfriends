@@ -15,9 +15,9 @@ With this application, users can efficiently manage and share PDF tickets, strea
 
 # Dev Setup
 
-1. Copy .env.sample to .env and set correct variables
+1. Copy .env.sample to .env and set correct variables for SMTP Server. If no SMTP Server is provided the PDFs cannot be sent by email. Ticket is only marked as shared if Email is sent successfully
 
-2. docker-compose up
+2. run 'docker-compose up' to build the docker images and run the application. Install docker if not available
 
 3. Access the app: http://localhost:8080
 
